@@ -1,17 +1,11 @@
-The LLVM Compiler Infrastructure
-================================
+Forked from llvm/llvm-project(15.0.6).
 
-This directory and its subdirectories contain source code for LLVM,
-a toolkit for the construction of highly optimized compilers,
-optimizers, and runtime environments.
+Add a new LLVM Pass "HelloNew" to generate DDG(Data Dependency Graph).
 
-LLVM is open source software. You may freely distribute it under the terms of
-the license agreement found in LICENSE.txt.
+Usage:
 
-Please see the documentation provided in docs/ for further
-assistance with LLVM, and in particular docs/GettingStarted.rst for getting
-started with LLVM and docs/README.txt for an overview of LLVM's
-documentation setup.
+`build/bin/opt -disable-output test.ll -passes=hellonew`
 
-If you are writing a package for LLVM, see docs/Packaging.rst for our
-suggestions.
+More details:
+
+https://llvm.org/docs/WritingAnLLVMNewPMPass.html
