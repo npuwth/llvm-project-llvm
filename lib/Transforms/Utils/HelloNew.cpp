@@ -13,6 +13,7 @@ using namespace llvm;
     return os.str();
 }*/
 
+//判断str是否以s打头
 bool stringStartWith(std::string str, std::string s)
 {
 	if(s.length() > str.length())
@@ -20,7 +21,7 @@ bool stringStartWith(std::string str, std::string s)
 	return str.substr(0,s.length()) == s;
 }
 
-//����Ǳ������ñ��������֣������ָ������ָ�������
+//如果是变量则获得变量的名字，如果是指令则获得指令的内容
 std::string HelloNewPass::getValueName(Value *v) {
 	if(value2name.find(v) != value2name.end())
 		return value2name[v];
@@ -38,7 +39,6 @@ std::string HelloNewPass::getValueName(Value *v) {
 			temp_result += std::to_string(num);
 			num++;
 		}
-        
     } 
     else {
         temp_result = v->getName().str();
@@ -51,11 +51,12 @@ std::string HelloNewPass::getValueName(Value *v) {
 
 
 int HelloNewPass::node::totalId = 0;
+//新建Node节点，totalId为节点编号
 HelloNewPass::node* HelloNewPass::getNode(Value* v, Instruction* inst)
 {
 	HelloNewPass::node* temp = NULL;
 	
-	if(dyn_cast<llvm::ConstantInt>(v))
+	if(dyn_cast<llvm::ConstantInt>(v))//传入的value是一个常量
 	{
 		temp = new HelloNewPass::node(v, getValueName(v));
 		this->value2node[v] = temp;
@@ -79,7 +80,7 @@ HelloNewPass::node* HelloNewPass::getNode(Value* v, Instruction* inst)
 		HelloNewPass::node::totalId++;
 		temp->id = HelloNewPass::node::totalId;
 	}*/
-	else if(this->value2node.find(v) != this->value2node.end())
+	else if(this->value2node.find(v) != this->value2node.end())//已经有了这个node
 		temp = this->value2node[v];
 	else
 	{
@@ -91,7 +92,7 @@ HelloNewPass::node* HelloNewPass::getNode(Value* v, Instruction* inst)
 	}
 	
 	
-	if(inst)
+	if(inst)//如果有inst，就给Node赋值
 	{
 		temp->opcode = inst->getOpcode();
 		temp->opcodeName = inst->getOpcodeName();
@@ -100,7 +101,7 @@ HelloNewPass::node* HelloNewPass::getNode(Value* v, Instruction* inst)
 	return temp;
 }
 
-void HelloNewPass::linkNode(node* s, node* e)
+void HelloNewPass::linkNode(node* s, node* e)//连接 s --> e
 {
 	if(std::find(s->successors.begin(),s->successors.end(), e) == s->successors.end())
 		s->successors.push_back(e);
@@ -108,6 +109,7 @@ void HelloNewPass::linkNode(node* s, node* e)
 		e->predecessors.push_back(s);
 }
 
+//新建Edge边，s --> e
 HelloNewPass::edge* HelloNewPass::getEdge(HelloNewPass::node* s, HelloNewPass::node* e)
 {
 	HelloNewPass::edge* temp = new edge(s,e);
@@ -115,10 +117,11 @@ HelloNewPass::edge* HelloNewPass::getEdge(HelloNewPass::node* s, HelloNewPass::n
 	return temp;
 }
 
+//计算出所有的边，放入edges数组
 void HelloNewPass::calculateEdge()
 {
 	releaseEdge();
-	std::vector<node*>::iterator iter2 = nodes.begin();
+	std::vector<node*>::iterator iter2 = nodes.begin();//遍历所有节点
 	for(;iter2 !=  nodes.end();)
 	{
 		node* n = *iter2;
@@ -135,17 +138,13 @@ void HelloNewPass::calculateEdge()
 			}
 			iter2++;
 		}
-			
-
-		
 	}
-
 }
 
-
+//释放所有的node
 void HelloNewPass::releaseNode()
 {
-	std::vector<node*>::iterator iter2 = nodes.begin();
+	std::vector<node*>::iterator iter2 = nodes.begin();//遍历所有节点
 	for(;iter2 !=  nodes.end();iter2++)
 	{
 		delete *iter2;
@@ -154,10 +153,10 @@ void HelloNewPass::releaseNode()
 	value2node.clear();
 }
 
-
+//释放所有的edge
 void HelloNewPass::releaseEdge()
 {
-	std::vector<edge*>::iterator iter = edges.begin();
+	std::vector<edge*>::iterator iter = edges.begin();//遍历所有边
 	for(;iter !=  edges.end();iter++)
 	{
 		delete *iter;
@@ -165,22 +164,18 @@ void HelloNewPass::releaseEdge()
 	edges.clear();
 }
 
-
-
-
-
+//简化生成的DDG
 void HelloNewPass::simplify()
 {
 	std::vector<node*>::iterator iter2;
 
-	//���getelementptrǰ������ڵ�
+	//标记getelementptr前的数组节点
 	iter2 = nodes.begin();
-	for(;iter2 !=  nodes.end();)
+	for(;iter2 !=  nodes.end();)//遍历所有节点
 	{
 		node* n = *iter2;
 		if (n->opcodeName == "getelementptr")
 		{
-			
 			for(long unsigned int j = 0; j < n->predecessors.size(); j++)
 			{
 				node* pr = n->predecessors[j];
@@ -194,12 +189,9 @@ void HelloNewPass::simplify()
 			}
 		}
 		iter2++;
-		
-		
 	}
-
 	
-	//���⴦���洢����Ԫ�ص�store�ڵ�
+	//特殊处理存储数组元素的store节点
 	iter2 = nodes.begin();
 	for(;iter2 !=  nodes.end();iter2++)
 	{
@@ -219,7 +211,7 @@ void HelloNewPass::simplify()
 		}
 	}
 	
-	//�Ƴ�stroe�ڵ�
+	//移除store节点
 	iter2 = nodes.begin();
 	for(;iter2 !=  nodes.end();)
 	{
@@ -254,7 +246,7 @@ void HelloNewPass::simplify()
 		}
 	}
 	
-	//�Ƴ�load�ڵ�
+	//移除load节点
 	iter2 = nodes.begin();
 	for(;iter2 !=  nodes.end();)
 	{
@@ -289,7 +281,7 @@ void HelloNewPass::simplify()
 	}
 	
 	
-	//�Ƴ�sext�ڵ�
+	//移除sext节点
 	iter2 = nodes.begin();
 	for(;iter2 !=  nodes.end();)
 	{
@@ -323,7 +315,7 @@ void HelloNewPass::simplify()
 		}
 	}
 	
-	//�Ƴ�getelementptrǰ��num:0�ڵ�
+	//移除getelementptr前的num:0节点
 	iter2 = nodes.begin();
 	for(;iter2 !=  nodes.end();)
 	{
@@ -351,7 +343,7 @@ void HelloNewPass::simplify()
 	}
 	
 	
-    //����getelementptr�ı�����Ϊ������+��������
+    //更改getelementptr的变量名为数组名+数组索引
 	iter2 = nodes.begin();
 	for(;iter2 !=  nodes.end();)
 	{
@@ -403,7 +395,7 @@ void HelloNewPass::simplify()
 	
 
 	
-	//�Ƴ�����ǰ����������
+	//移除数组前的数组连线
 	iter2 = nodes.begin();
 	for(;iter2 !=  nodes.end();)
 	{
@@ -438,7 +430,7 @@ void HelloNewPass::simplify()
 	
 
 	
-	//��������Ԫ��
+	//连接数组元素
 	node* curAryEleStore = NULL;
 	iter2 = nodes.begin();
 	std::vector<node*> deleteNodes;
@@ -520,7 +512,7 @@ void HelloNewPass::simplify()
 	deleteNodes.clear();
 	
 	
-	//�Ƴ�AryEleStore�ڵ�
+	//移除AryEleStore节点
 	iter2 = nodes.begin();
 	for(;iter2 !=  nodes.end();)
 	{
@@ -556,7 +548,7 @@ void HelloNewPass::simplify()
 	}
 	
 	
-	//ȥ���޺�̽ڵ��getelementptr�ڵ�
+	//去除无后继节点的getelementptr节点
 	int deleteCount = 0;
 	while(1)
 	{
@@ -600,7 +592,7 @@ void HelloNewPass::simplify()
 	}
 	
 
-	/*//�Ƴ�getelementptr�ڵ�
+	/*//移除getelementptr节点
 	iter2 = nodes.begin();
 	for(;iter2 !=  nodes.end();)
 	{
@@ -639,18 +631,21 @@ void HelloNewPass::simplify()
 
 
 PreservedAnalyses HelloNewPass::run(Function &F, FunctionAnalysisManager &AM) {
-    // errs() << "Function: " << F.getName() << "\n";                     //��ʾ��������
+    // errs() << "Function: " << F.getName() << "\n";                     //显示函数名称
     // errs() << "num_function=" << num_function << "\n"; // num_function=0
     num_function++;
 	
-    //���������е�basicblock
+    //遍历函数中的basicblock
     int num_BB = 0;
     for (Function::iterator BB = F.begin(); BB != F.end(); ++BB) 
     {
-        // errs() << "block size:BB->size() " << BB->size() << "\n"; 
+        // errs() << "块的长度 size:BB->size() " << BB->size() << "\n"; 
 
         num_BB++;
         BasicBlock *curBB = &*BB;
+
+		if(F.getName().str() != "forward")//筛选出想要研究的函数
+			continue;
         
 		std::string fileName = F.getName().str() + "BB" + std::to_string(num_BB);
 
@@ -666,13 +661,13 @@ PreservedAnalyses HelloNewPass::run(Function &F, FunctionAnalysisManager &AM) {
 			// errs() << "\t" << curII->getOpcodeName() << "\n";
 			
             switch (curII->getOpcode()) {
-            //����load��store���ڴ���в�������Ҫ��loadָ���stroeָ������д���
+            //由于load和store对内存进行操作，需要对loadָ和stroeָ指令单独进行处理
                 case llvm::Instruction::Load: {
                     LoadInst *linst = dyn_cast<LoadInst>(curII);
                     Value *loadValPtr = linst->getPointerOperand();
                     //edges.push_back(
                         linkNode(
-                            getNode(loadValPtr,NULL),
+                            getNode(loadValPtr,NULL),//形成依赖边
                             getNode(curII, curII)
                         );
                     //);
@@ -696,7 +691,7 @@ PreservedAnalyses HelloNewPass::run(Function &F, FunctionAnalysisManager &AM) {
 					);*/
                     //edges.push_back(
 						linkNode(
-							getNode(storeVal, NULL),
+							getNode(storeVal, NULL),//形成 值-->地址 的依赖
 							getNode(storeValPtr, curII)
 						);
 					//);
@@ -724,7 +719,7 @@ PreservedAnalyses HelloNewPass::run(Function &F, FunctionAnalysisManager &AM) {
 						{
                             //edges.push_back(
 								linkNode(
-									getNode(op->get(), NULL),
+									getNode(op->get(), NULL),//???还没看懂
 									getNode(curII, curII)
 								);
 							//);
@@ -822,7 +817,7 @@ bool llvm::cmpNode(HelloNewPass::node* a,HelloNewPass::node* b)
 	return (a->id<b->id);
 }
 
-HelloNewPass::node* HelloNewPass::findNodeById(int id)
+HelloNewPass::node* HelloNewPass::findNodeById(int id)//遍历查找，通过id找node
 {
 	for(long unsigned int i = 0;i<nodes.size();i++)
 	{
@@ -832,7 +827,7 @@ HelloNewPass::node* HelloNewPass::findNodeById(int id)
 	return NULL;
 }
 
-//���ڼ���ͬ����������ͼ
+//             ----------------以下用于计算同构无依赖子图------------------            //
 
 void HelloNewPass::releaseSubgraph() 
 { 
@@ -849,7 +844,7 @@ void HelloNewPass::calculateSubgraph()
 	findSameSubgraph();
 }
 
-void HelloNewPass::topologicalSort() 
+void HelloNewPass::topologicalSort() // 拓扑排序
 {
 	std::vector<node*>::iterator iter = nodes.begin();
 	for(;iter!=nodes.end();iter++)
@@ -897,7 +892,7 @@ void HelloNewPass::topologicalSort()
 
 void HelloNewPass::findSameSubgraph()
 {
-	//�ҳ�ͼ�����еĽڵ�����
+	//找出图中所有的节点类型
 	std::set<std::string> nodeOpcodes;
 	std::map<std::string, std::vector<node*>> opcode2nodes;
 	for(long unsigned int l = 0;l<layers.size();l++)
@@ -912,16 +907,16 @@ void HelloNewPass::findSameSubgraph()
 		}
 	}
 
-	//���ÿ�ֽڵ����ͣ��ҳ�ȫ����ͬ����ͼ����
+	//针对每种节点类型，找出全部的同构子图方案
 	std::set<std::string>::iterator itNodeOpcodes = nodeOpcodes.begin();
 	for(;itNodeOpcodes != nodeOpcodes.end();itNodeOpcodes++)
 	{
 		std::string opcode = *itNodeOpcodes;
-		//���ÿ�ֽڵ����ͣ��ҳ�ȫ���ĵ����ڵ��ͬ����ͼ����
+		//针对每种节点类型，找出全部的单个节点的同构子图方案
 		std::vector<SameSubgraph> sameSubgraphsForOneOpcode;
 		std::vector<std::vector<node*>> allCombinationOfNodes;
 		int opcodeNodeCount = opcode2nodes[opcode].size();
-		//�ֱ�Ѱ���������ͼ���������ͼ���������
+		//分别寻找两组的子图，三组的子图，四组的子图
 		for(int sameSubgraphCount = 2;sameSubgraphCount<=4 && sameSubgraphCount<=opcodeNodeCount;sameSubgraphCount++)
 		{
 
@@ -941,7 +936,7 @@ void HelloNewPass::findSameSubgraph()
 
 		//errs() << "Opcode: " << opcode << "\n";
 
-		//�����ʼ�ĵ����ڵ��ͬ����ͼ
+		//构造初始的单个节点的同构子图
 		for(long unsigned int i = 0;i<allCombinationOfNodes.size();i++)
 		{
 			SameSubgraph sameSubgraphForOneCombination;
@@ -949,7 +944,7 @@ void HelloNewPass::findSameSubgraph()
 			sameSubgraphForOneCombination.nodeCountForSubgraph = graphCount;
 			
 
-			//���ù������ڵ�Ϊmask����������ͼ������չ�Ĺ��̾�������Щmask�ڵ���
+			//设置公共父节点为mask，后续的子图进行扩展的过程就跳过这些mask节点了
 			//errs() << "mask: ";
 			std::vector<node*> commonParentNodes = getCommonParentNodes(allCombinationOfNodes[i]);
 			for(long unsigned int j = 0;j<commonParentNodes.size();j++)
@@ -957,7 +952,7 @@ void HelloNewPass::findSameSubgraph()
 				sameSubgraphForOneCombination.mask[commonParentNodes[j]] = true;
 				//errs() << commonParentNodes[j]->id << " ";
 			}
-			//���������ڵ���mask
+			//设置自身节点标记mask
 			for (int j = 0; j < graphCount; j++)
 			{
 				node* n = allCombinationOfNodes[i][j];
@@ -967,7 +962,7 @@ void HelloNewPass::findSameSubgraph()
 
 			//errs() << "nodes: ";
 
-			//����ͬ����ͼ�е�������ͼ
+			//构造同构子图中的所有子图
 			for(int j = 0;j< graphCount;j++)
 			{
 				node* n = allCombinationOfNodes[i][j];
@@ -977,7 +972,7 @@ void HelloNewPass::findSameSubgraph()
 				subgraphForOneNode.minDepth = n->depth;
 				subgraphForOneNode.maxDepth = n->depth;
 
-				//���ÿ���չ�Ľڵ�Ϊ��ǰ�ڵ��ǰ���ͺ�̵ļ���
+				//设置可扩展的节点为当前节点的前驱和后继的集合
 				for (long unsigned int k = 0; k < n->predecessors.size(); k++)
 				{
 					if(sameSubgraphForOneCombination.mask.find(n->predecessors[k]) == sameSubgraphForOneCombination.mask.end() &&
@@ -1028,7 +1023,7 @@ void HelloNewPass::findSameSubgraph()
 	}
 
 
-	//���ҵ���������ͼ��ռ�нڵ�������ͬ����ͼ��ȡ���
+	//在找到的所有子图中占有节点数最多的同构子图提取结果
 	itAllSameSubgraphs = allSameSubgraphs.begin();
 	int maxCount = 0;
 	SameSubgraph* biggestSameSubgraph = NULL;
@@ -1044,7 +1039,7 @@ void HelloNewPass::findSameSubgraph()
 		}
 	}
 
-	//������ͬ����ͼ���
+	//输出最大同构子图结果
 	if(biggestSameSubgraph!=NULL)
 	{
 		errs() << "Find Same Subgraph!  node count: " << biggestSameSubgraph->nodeCountForSubgraph << "\n";
@@ -1070,7 +1065,7 @@ void HelloNewPass::findSameSubgraph()
 	//testAreTwoSubgraphIndependent2();
 }
 
-//������չһ����ͼ
+//尝试扩展一组子图
 void HelloNewPass::extendSameSubgraph(SameSubgraph& sameSubgraph)
 {
 	bool extended = false;
@@ -1085,12 +1080,12 @@ void HelloNewPass::extendSameSubgraph(SameSubgraph& sameSubgraph)
 	}
 }
 
-//������չ�򷵻�true��û��չ�򷵻�false
+//可以扩展则返回true，没扩展则返回false
 bool HelloNewPass::extendSameSubgraphOnce(SameSubgraph& sameSubgraph)
 {
 	bool extended = false;
 	
-	//�����κ�һ����ͼû�п���չ�Ľڵ��򷵻�false����ʾͬ����ͼ������չ
+	//其中任何一个子图没有可扩展的节点则返回false，表示同构子图不可扩展
 	bool noNodesCanExtend = false;
 	for (long unsigned int i = 0; i < sameSubgraph.subgraphs.size(); i++)
 	{
@@ -1155,7 +1150,7 @@ bool HelloNewPass::extendSameSubgraphOnce(SameSubgraph& sameSubgraph)
 			}
 		}
 
-		//�ж��Ƿ���ͬ����ͬ�ṹ��һ��ڵ㣬ֻ�����������ͼ����һ����չ
+		//判断是否是同类型同结构的一组节点，只有这样多个子图才能一起扩展
 		bool nodesSame = true;
 		nodesExtendForEachSubgraph[0] = nodesCanExtendForSubgraphs[0][extendEachConditionIndex[0]];
 		for (int i = 1; i < graphCount; i++)
@@ -1170,7 +1165,7 @@ bool HelloNewPass::extendSameSubgraphOnce(SameSubgraph& sameSubgraph)
 
 		if (nodesSame)
 		{
-			//������չ����ڵ�
+			//尝试扩展这组节点
 			if (extendSameSubgraphOnceOneNode(sameSubgraph, nodesExtendForEachSubgraph))
 			{
 
@@ -1194,7 +1189,7 @@ bool HelloNewPass::extendSameSubgraphOnce(SameSubgraph& sameSubgraph)
 
 bool HelloNewPass::extendSameSubgraphOnceOneNode(SameSubgraph& sameSubgraph, std::vector<node*>& nodesExtendForEachSubgraph)
 {
-	//�ж�Ҫ����չ�Ľڵ���Ե�ǰͼ����С��ȵĲ�ֵ��ֻ�и���Ҫ��չ�Ľڵ����Ȳ�ֵһ�²��ܶ�����ڵ������չ
+	//判断要被扩展的节点相对当前图中最小深度的差值，只有各个要扩展的节点的深度差值一致才能对这组节点进行扩展
 	int graphCount = sameSubgraph.subgraphs.size();
 
 	int deltaDepth = sameSubgraph.subgraphs[0].minDepth - nodesExtendForEachSubgraph[0]->depth;
@@ -1207,16 +1202,16 @@ bool HelloNewPass::extendSameSubgraphOnceOneNode(SameSubgraph& sameSubgraph, std
 		}
 	}
 
-	//����һ���µ���ͼ
+	//构造一批新的子图
 	std::vector<graph> subgraphsTest;
 	for (int i = 0; i < graphCount; i++)
 	{
 		graph subgraphTest;
 		
-		if (deltaDepth > 0)//��Ҫ��չ�Ľڵ�����С��Ŀǰ��ͼ�е���С���
+		if (deltaDepth > 0)//当要扩展的节点的深度小于目前子图中的最小深度
 		{
 			subgraphTest[0].push_back(nodesExtendForEachSubgraph[i]);
-			//Ϊ��֤ͼ�������ԣ���Ȳ����1�Ļ���Ҫ��ͼ�м����յĲ�
+			//为保证图的完整性，深度差大于1的话就要在图中间插入空的层
 			for (int l = 1; l < deltaDepth; l++)
 			{
 				subgraphTest[l].clear();
@@ -1226,13 +1221,13 @@ bool HelloNewPass::extendSameSubgraphOnceOneNode(SameSubgraph& sameSubgraph, std
 				subgraphTest[l] = sameSubgraph.subgraphs[i]._graph[l - deltaDepth];
 			}
 		}
-		else if (-deltaDepth + 1 > currentLayersCount)//��Ҫ��չ�Ľڵ����ȴ���Ŀǰ��ͼ�е�������
+		else if (-deltaDepth + 1 > currentLayersCount)//当要扩展的节点的深度大于目前子图中的最大深度
 		{
 			for (int l = 0; l < currentLayersCount; l++)
 			{
 				subgraphTest[l] = sameSubgraph.subgraphs[i]._graph[l];
 			}
-			//Ϊ��֤ͼ�������ԣ���Ȳ����1�Ļ���Ҫ��ͼ�м����յĲ�
+			//为保证图的完整性，深度差大于1的话就要在图中间插入空的层
 			for (int l = currentLayersCount; l < -deltaDepth; l++)
 			{
 				subgraphTest[l].clear();
@@ -1240,7 +1235,7 @@ bool HelloNewPass::extendSameSubgraphOnceOneNode(SameSubgraph& sameSubgraph, std
 			subgraphTest[-deltaDepth].push_back(nodesExtendForEachSubgraph[i]);
 
 		}
-		else//��Ҫ��չ�Ľڵ�������Ŀǰ��ͼ�е���С��Ⱥ�������֮��
+		else//当要扩展的节点的深度在目前子图中的最小深度和最大深度之间
 		{
 			for (int l = 0; l < currentLayersCount; l++)
 			{
@@ -1251,12 +1246,12 @@ bool HelloNewPass::extendSameSubgraphOnceOneNode(SameSubgraph& sameSubgraph, std
 		subgraphsTest.push_back(subgraphTest);
 	}
 
-	//�ж������µ���ͼ�Ƿ�������
+	//判断这批新的子图是否无依赖
 	if (!areSubgraphsAllIndependent(subgraphsTest))
 	{
 		return false;
 	}
-	//�ж������µ���ͼ�Ƿ�ͬ��
+	//判断这批新的子图是否同构
 	for (int i = 1; i < graphCount; i++)
 	{
 		if (!areTwoSubgraphSame(subgraphsTest[0], subgraphsTest[i]))
@@ -1266,21 +1261,21 @@ bool HelloNewPass::extendSameSubgraphOnceOneNode(SameSubgraph& sameSubgraph, std
 	}
 
 
-	//����ǰ����жϣ�ִ�е�����ͱ�ʾ������չ��Щ�ڵ���
+	//经过前面的判断，执行到这里就表示可以扩展这些节点了
 
-	//���ӵ�ǰ������ͼ�Ľڵ�����
+	//增加当前所有子图的节点数量
 	sameSubgraph.nodeCountForSubgraph += graphCount;
 	for (int i = 0; i < graphCount; i++)
 	{
 		node* n = nodesExtendForEachSubgraph[i];
 
-		//��������չ����Щ�ڵ���mask
+		//设置新扩展的这些节点标记mask
 		sameSubgraph.mask[n] = true;
 		
-		//�����µ���ͼ����
+		//设置新的子图集合
 		sameSubgraph.subgraphs[i]._graph = subgraphsTest[i];
 
-		//��������ͼ���
+		//重新设置图深度
 		if (deltaDepth > 0)
 		{
 			sameSubgraph.subgraphs[i].minDepth -= deltaDepth;
@@ -1290,10 +1285,10 @@ bool HelloNewPass::extendSameSubgraphOnceOneNode(SameSubgraph& sameSubgraph, std
 			sameSubgraph.subgraphs[i].maxDepth += (-deltaDepth + 1 - currentLayersCount);
 		}
 
-		//�ڿ���չ�б��������ǰ����չ�ĵ�
+		//在可扩展列表中清除当前被扩展的点
 		sameSubgraph.subgraphs[i].nodesCanExtend.erase(sameSubgraph.subgraphs[i].nodesCanExtend.find(n));
 		
-		//����ǰ����չ�ĵ��ǰ���ͺ�̼��뵽����չ�б���
+		//将当前被扩展的点的前驱和后继加入到可扩展列表中
 		for (long unsigned int k = 0; k < n->predecessors.size(); k++)
 		{
 			if (sameSubgraph.mask.find(n->predecessors[k]) == sameSubgraph.mask.end() &&
@@ -1326,7 +1321,7 @@ bool HelloNewPass::isCalculateNode(node* node)
 std::vector<HelloNewPass::node*> HelloNewPass::getCommonParentNodes(std::vector<node*>& nodes)
 {
 	std::vector<node*> ret;
-	std::unordered_map<node*, int> parentCountForCildren;//��¼ÿ���ڵ��Ƕ��ٸ�����������ͼ�Ľڵ�ĸ��ڵ㣬����1��������mask
+	std::unordered_map<node*, int> parentCountForCildren;//记录每个节点是多少个用来构建子图的节点的父节点，大于1的设置其mask
 	for(long unsigned int j = 0;j<nodes.size();j++)
 	{
 		node* n = nodes[j];
@@ -1359,7 +1354,7 @@ std::vector<HelloNewPass::node*> HelloNewPass::getCommonParentNodes(std::vector<
 	}
 	//errs() << "masks: ";
 
-	//����parentCountForCildren����1�Ľڵ�mask
+	//设置parentCountForCildren大于1的节点mask
 	std::unordered_map<node*, int>::iterator itParentCountForCildren = parentCountForCildren.begin();
 	for(;itParentCountForCildren != parentCountForCildren.end(); itParentCountForCildren++)
 	{
@@ -1415,7 +1410,7 @@ void HelloNewPass::testAreTwoSubgraphIndependent1()
 	Tgraph[2] = T3layer;
 	Tgraph[3] = T4layer;
 
-	//Ӧ�÷���True
+	//应该返回True
 	errs() <<"IsGraphIndependent: "<< areTwoSubgraphIndependent(Ograph, Tgraph) << "\n\n";
 }
 
@@ -1459,17 +1454,17 @@ void HelloNewPass::testAreTwoSubgraphIndependent2()
 	Tgraph[2] = T3layer;
 	Tgraph[3] = T4layer;
 
-	//Ӧ�÷���False
+	//应该返回False
 	errs() <<"IsGraphIndependent: "<< areTwoSubgraphIndependent(Ograph, Tgraph) << "\n\n";
 }
 
 bool HelloNewPass::areTwoSubgraphIndependent(graph& subgraph1,graph& subgraph2)
 {
-	std::unordered_map<node*, bool> node2flag;//���ڶԽڵ������
-	//ʹ�� node2flag["""node*"""] = true; �Խڵ������
-	//ʹ�� if( node2flag.find("""node*""")==node2flag.end() ) �ж��Ƿ��Ѿ�������ýڵ�
-	//����ʹ�� if( node2flag["""node*"""] == true ) , ��Ϊ node2flag["""node*"""] �����Զ�����һ��key-value�Զ�
-	//ʹ�� node2flag.clear() ���������ϣ��(unordered_map), �Ӷ�ʵ�ֶԽڵ��ǵĳ�ʼ��
+	std::unordered_map<node*, bool> node2flag;//用于对节点做标记
+	//使用 node2flag["""node*"""] = true; 对节点做标记
+	//使用 if( node2flag.find("""node*""")==node2flag.end() ) 判断是否已经计算过该节点
+	//不能使用 if( node2flag["""node*"""] == true ) , 因为 node2flag["""node*"""] 语句会自动创建一个key-value对儿
+	//使用 node2flag.clear() 清除整个哈希表(unordered_map), 从而实现对节点标记的初始化
 	
 	std::set<node*> predecessorsOfSubgraph1;
 	std::set<node*> Subgraph2;
@@ -1486,8 +1481,8 @@ bool HelloNewPass::areTwoSubgraphIndependent(graph& subgraph1,graph& subgraph2)
 			node* n = subgraph1[l][i];
 			//n->predecessors//.....to do
 			//n->predecessors => vector<node*>
-			//n->predecessors �� vector<node*> ���ͣ�������������n��ǰ��
-			//for(int p = 0;p<n->predecessors.size();p++) //����������� ��BFS��
+			//n->predecessors 是 vector<node*> 类型，所以这样遍历n的前驱
+			//for(int p = 0;p<n->predecessors.size();p++) //广度优先搜索 （BFS）
 			{
 				//node* pn = n->predecessors[p];
 				q.push(n);
@@ -1498,7 +1493,7 @@ bool HelloNewPass::areTwoSubgraphIndependent(graph& subgraph1,graph& subgraph2)
 					q.pop();
 					predecessorsOfSubgraph1.insert(px);
 					//count++;
-					//px->predecessors �� vector<node*> ���ͣ�������������px��ǰ��
+					//px->predecessors 是 vector<node*> 类型，所以这样遍历px的前驱
 					for(long unsigned int pp = 0;pp<px->predecessors.size();pp++)
 					{
 						node* ppn = px->predecessors[pp];
@@ -1539,7 +1534,7 @@ bool HelloNewPass::areTwoSubgraphIndependent(graph& subgraph1,graph& subgraph2)
 			return false;
 		}
 	}
-	//���������е�����Ԫ�� 
+	//遍历集合中的所有元素
 	//for (it = predecessorsOfSubgraph1.begin();it!=predecessorsOfSubgraph1.end();it++)
 	//{
 	//	for(it1 = Subgraph2.begin(); it1 != Subgraph2.end(); it1++)
@@ -1564,7 +1559,7 @@ bool HelloNewPass::areTwoSubgraphIndependent(graph& subgraph1,graph& subgraph2)
 			
 			std::queue<node*> q;
 			node* n = subgraph2[l][i];
-			//for(int p = 0;p<n->predecessors.size();p++) //����������� ��BFS��
+			//for(int p = 0;p<n->predecessors.size();p++) //广度优先搜索 （BFS）
 			{
 				//node* pn = n->predecessors[p];
 				q.push(n);
@@ -1574,7 +1569,7 @@ bool HelloNewPass::areTwoSubgraphIndependent(graph& subgraph1,graph& subgraph2)
 					node* px=q.front();
 					q.pop();
 					predecessorsOfSubgraph2.insert(px);
-					//px->predecessors �� vector<node*> ���ͣ�������������px��ǰ��
+					//px->predecessors 是 vector<node*> 类型，所以这样遍历px的前驱
 					for(long unsigned int pp = 0;pp<px->predecessors.size();pp++)
 					{
 						node* ppn = px->predecessors[pp];
@@ -1737,7 +1732,7 @@ bool HelloNewPass::areTwoNodeIndependent(node* node1,node* node2)
 	return true;
 }
 
-//�ж��Ƿ����е���Щ�ڵ��໥������������������true��������������false
+//判断是否所有的这些节点相互无依赖，无依赖返回true，存在依赖返回false
 bool HelloNewPass::areNodesAllIndependent(std::vector<node*>& nodes)
 {
 	for(long unsigned int i = 0;i<nodes.size();i++)
@@ -1943,7 +1938,7 @@ bool HelloNewPass::areTwoSubgraphSame(graph& subgraph1,graph& subgraph2)
 	assert(!subgraph1.empty());
 	if(subgraph1.size() != subgraph2.size())
 		return false;
-	//�ж�ÿ��Ľڵ�����Ƿ����
+	//判断每层的节点个数是否相等
 	for(long unsigned int i = 0;i<subgraph1.size();i++)
 	{
 		if(subgraph1[i].size() != subgraph2[i].size())
@@ -1952,7 +1947,7 @@ bool HelloNewPass::areTwoSubgraphSame(graph& subgraph1,graph& subgraph2)
 		}
 	}
 	
-	//�ж�ÿ��Ľڵ������Ƿ��ܶ�Ӧ��
+	//判断每层的节点类型是否能对应上
 	for(long unsigned int l = 0;l<subgraph1.size();l++)
 	{
 		std::vector<bool> flag;
@@ -1993,8 +1988,8 @@ bool HelloNewPass::areTwoSubgraphLayerSame(graph& subgraph1,graph& subgraph2, lo
 	{
 		return true;
 	}
-	std::vector<node*> oriOrder;//��¼ͼһ��ǰ��Ľڵ�,ͼ����ǰ����ͼһ��ǰ��ƥ��
-	std::vector<std::vector<node*>> SearchOrders; //���е�ͼ����ǰ��Ŀ��ܽ��
+	std::vector<node*> oriOrder;//记录图一当前层的节点，图二当前层向图一当前层匹配
+	std::vector<std::vector<node*>> SearchOrders; //所有的图二当前层的可能结果
 	std::vector<std::vector<bool>> SearchFlags;
 	long unsigned int curSearchOrderId = 0;
 
@@ -2094,7 +2089,7 @@ bool HelloNewPass::areTwoNodeMatchInSubgraph(graph& subgraph1,graph& subgraph2, 
 			return true;
 		}
 
-		//�ж��ϲ㸸�ڵ��λ���Ƿ���ȷ������ֻҪλ����ȷ�����ڵ�����;�һ����ȷ����Ϊ�ڹ���ÿ���˳���ʱ�򣬾��ǰ�����ͬ���͵ļ���ڵ㹹���
+		//判断上层父节点的位置是否正确，这里只要位置正确，父节点的类型就一定正确，因为在构建每层的顺序的时候，就是按照相同类型的计算节点构造的
 		std::set<std::pair<int,int>> predecessors1;
 		for(long unsigned int i =0; i < n1->predecessors.size(); i++)
 		{
@@ -2136,7 +2131,7 @@ bool HelloNewPass::areTwoNodeMatchInSubgraph(graph& subgraph1,graph& subgraph2, 
 		}
 		std::set<std::pair<int,int>>::iterator it;
 		std::set<std::pair<int,int>>::iterator it1;
-		//���������е�����Ԫ�� 
+		//遍历集合中的所有元素
 		for (it = predecessors1.begin(), it1 = predecessors2.begin(); it != predecessors1.end(); it++, it1++){
 			if (it1->first != it->first || it1->second != it->second){
 				return false;

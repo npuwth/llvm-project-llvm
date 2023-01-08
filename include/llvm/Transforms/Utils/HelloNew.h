@@ -16,8 +16,8 @@ namespace llvm {
 class HelloNewPass : public PassInfoMixin<HelloNewPass> {
 	public:
  
-	std::list<Instruction *>::iterator itor_former; //���������
-	int num_function = 0;                           //������¼���ٸ�����
+	std::list<Instruction *>::iterator itor_former; //定义迭代器
+	int num_function = 0;                           //用来记录多少个函数
 
 	int num;
 
@@ -36,8 +36,8 @@ class HelloNewPass : public PassInfoMixin<HelloNewPass> {
 		std::string indexName;
 		node* indexNode = NULL;
 
-		std::vector<node*> predecessors;
-		std::vector<node*> successors;
+		std::vector<node*> predecessors;//前驱节点
+		std::vector<node*> successors;  //后继节点
 
 		node(Value* value, std::string valueName, int opcode, std::string opcodeName){
 			this->value = value;
@@ -55,7 +55,7 @@ class HelloNewPass : public PassInfoMixin<HelloNewPass> {
 		}
 
 
-		//���ڼ���ͬ����������ͼ
+		//用于计算同构无依赖子图
 		int inCount;
 		int depth;
 	};
@@ -71,8 +71,8 @@ class HelloNewPass : public PassInfoMixin<HelloNewPass> {
 			this->e = e;
 		}
 	};
-	std::vector<edge*> edges;
-	std::vector<node*> nodes;
+	std::vector<edge*> edges;//存储所有边
+	std::vector<node*> nodes;//存储所有节点
 	node* findNodeById(int id);
 
 	std::map<Value*, std::string> value2name;
@@ -96,7 +96,7 @@ class HelloNewPass : public PassInfoMixin<HelloNewPass> {
 
 	void outputBasicBlockNodesGraph(std::string fileName, bool isSimple);
 
-	//���ڼ���ͬ����������ͼ
+	//用于计算同构无依赖子图
 	public:
         void releaseSubgraph();
 
@@ -121,7 +121,7 @@ class HelloNewPass : public PassInfoMixin<HelloNewPass> {
 		bool areTwoSubgraphIndependent(graph& subgraph1,graph& subgraph2);
 		bool areSubgraphsAllIndependent(std::vector<graph>& subgraphs);
 
-		//keyΪ node1��id _ node2��id
+		//key为 node1的id _ node2的id
 		std::unordered_map<std::string, bool> node2nodeIndependent;
 		bool areTwoNodeIndependent(node* node1,node* node2);
 		bool areNodesAllIndependent(std::vector<node*>& nodes);
@@ -142,8 +142,8 @@ class HelloNewPass : public PassInfoMixin<HelloNewPass> {
 			public:
 				graph _graph;
 				std::set<node*> nodesCanExtend;
-				int minDepth; //��¼��ǰ��ͼ�нڵ���е���С���
-				int maxDepth; //��¼��ǰ��ͼ�нڵ���е�������
+				int minDepth; //记录当前子图中节点具有的最小深度
+				int maxDepth; //记录当前子图中节点具有的最大深度
 		};
 
 		class SameSubgraph
@@ -154,7 +154,7 @@ class HelloNewPass : public PassInfoMixin<HelloNewPass> {
 			std::unordered_map<node*, bool> mask;
 		};
 
-		//ȫ������ͼ������keyΪ�����룬 valueΪ�Ըò�����Ϊ���ĵ�������ͼ����
+		//全部的子图方案，key为操作码，value为以该操作码为核心的所有子图方案
 		std::map<std::string, std::vector<SameSubgraph>> allSameSubgraphs;
 
 		void extendSameSubgraph(SameSubgraph& sameSubgraph);
